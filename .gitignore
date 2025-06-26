@@ -17,6 +17,11 @@ coverage
 test-results
 playwright-report
 
+# LocalStack
+localstack-data/
+.env
+.env.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

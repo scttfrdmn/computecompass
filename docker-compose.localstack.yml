@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  localstack:
+    container_name: computecompass-localstack
+    image: localstack/localstack-pro:latest
+    ports:
+      - '4566:4566'
+      - '4510-4559:4510-4559'
+      - '443:443'
+    environment:
+      - DEBUG=1
+      - PERSISTENCE=1
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - LOCALSTACK_API_KEY=${LOCALSTACK_API_KEY}
+      - SERVICES=ec2,pricing,sts,iam
+      - EAGER_SERVICE_LOADING=1
+      - SKIP_INFRA_DOWNLOADS=1
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - './localstack-data:/var/lib/localstack'
+    networks:
+      - localstack-network
+
+networks:
+  localstack-network:
+    driver: bridge

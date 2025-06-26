@@ -17,7 +17,11 @@
     "test:e2e:ui": "playwright test --ui",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "localstack:start": "docker-compose -f docker-compose.localstack.yml up -d",
+    "localstack:stop": "docker-compose -f docker-compose.localstack.yml down",
+    "localstack:logs": "docker-compose -f docker-compose.localstack.yml logs -f",
+    "test:localstack": "VITE_APP_ENV=development npm run test"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
@@ -30,6 +34,9 @@
     "tailwindcss": "^4.1.10"
   },
   "devDependencies": {
+    "@aws-sdk/client-ec2": "^3.836.0",
+    "@aws-sdk/client-pricing": "^3.835.0",
+    "@aws-sdk/credential-provider-env": "^3.835.0",
     "@eslint/js": "^9.29.0",
     "@playwright/test": "^1.53.1",
     "@testing-library/jest-dom": "^6.6.3",
@@ -47,6 +54,7 @@
     "husky": "^9.1.7",
     "jsdom": "^26.1.0",
     "lint-staged": "^16.1.2",
+    "localstack": "^1.0.0",
     "prettier": "^3.6.1",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.34.1",
