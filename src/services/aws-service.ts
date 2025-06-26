@@ -6,6 +6,7 @@ import {
 import { PricingClient, GetProductsCommand } from '@aws-sdk/client-pricing'
 import { ec2Client, pricingClient } from '../lib/aws-client'
 import { MOCK_INSTANCE_TYPES, MOCK_PRICING_DATA } from '../lib/localstack-data'
+import { HardwareSpecsService } from './hardware-specs'
 import type {
   InstanceType,
   SpotPriceHistoryItem,
@@ -63,7 +64,12 @@ export class AWSService {
       const response = await this.ec2.send(command)
       const instanceTypes = response.InstanceTypes || []
 
-      this.instanceTypesCache = instanceTypes as InstanceType[]
+      // Enrich instances with detailed hardware specifications
+      const enrichedInstances = (instanceTypes as InstanceType[]).map(
+        instance => this.enrichInstanceWithHardwareSpecs(instance)
+      )
+
+      this.instanceTypesCache = enrichedInstances
       return this.instanceTypesCache
     } catch (error) {
       throw new AWSServiceError(
@@ -175,7 +181,7 @@ export class AWSService {
   /**
    * Get pricing information for a specific instance type
    */
-  async getPricing(
+  private async getSingleInstancePricing(
     instanceType: string,
     region = 'us-east-1'
   ): Promise<PriceListItem | null> {
@@ -287,6 +293,11 @@ export class AWSService {
             Value: 'Linux',
             Type: 'TERM_MATCH',
           },
+          {
+            Field: 'preInstalledSw',
+            Value: 'NA',
+            Type: 'TERM_MATCH',
+          },
         ],
         MaxResults: 10,
       })
@@ -298,7 +309,27 @@ export class AWSService {
         return null
       }
 
-      const priceData = JSON.parse(priceList[0]) as PriceListItem
+      const rawPriceData = priceList[0]
+      if (!rawPriceData) {
+        console.warn(`No price data returned for ${instanceType}`)
+        return null
+      }
+
+      // AWS SDK returns a special String object, need to convert to string
+      const priceDataString = rawPriceData.toString()
+
+      let priceData: PriceListItem
+      try {
+        priceData = JSON.parse(priceDataString) as PriceListItem
+      } catch (parseError) {
+        console.warn(
+          `Failed to parse pricing JSON for ${instanceType}:`,
+          parseError
+        )
+        console.warn('Raw data:', priceDataString.substring(0, 200) + '...')
+        return null
+      }
+
       this.pricingCache.set(cacheKey, priceData)
       return priceData
     } catch (error) {
@@ -308,6 +339,176 @@ export class AWSService {
         'Pricing'
       )
     }
+  }
+
+  /**
+   * Get pricing for multiple instance types (overload for array)
+   */
+  async getPricing(
+    instanceTypes: string[],
+    region?: string
+  ): Promise<
+    {
+      instanceType: string
+      onDemand: { pricePerHour: string }
+      reserved?: {
+        term1yr: { pricePerHour: string }
+        term3yr: { pricePerHour: string }
+      }
+      spot?: { pricePerHour: string }
+    }[]
+  >
+  /**
+   * Get pricing for single instance type (overload for string)
+   */
+  async getPricing(
+    instanceType: string,
+    region?: string
+  ): Promise<PriceListItem | null>
+  /**
+   * Implementation for both overloads
+   */
+  async getPricing(
+    instanceTypesOrSingle: string | string[],
+    region = 'us-east-1'
+  ): Promise<PriceListItem[] | PriceListItem | null> {
+    // Handle single instance type
+    if (typeof instanceTypesOrSingle === 'string') {
+      return this.getSingleInstancePricing(instanceTypesOrSingle, region)
+    }
+
+    // Handle array of instance types
+    const instanceTypes = instanceTypesOrSingle
+    const results = await Promise.allSettled(
+      instanceTypes.map(async instanceType => {
+        const pricing = await this.getPricingForInstance(instanceType, region)
+        if (!pricing) return null
+
+        // Extract on-demand pricing
+        const onDemandTerms = pricing.terms?.OnDemand || {}
+        const onDemandTerm = Object.values(onDemandTerms)[0]
+        const onDemandDimension = onDemandTerm?.priceDimensions
+          ? Object.values(onDemandTerm.priceDimensions)[0]
+          : null
+        const onDemandPrice = onDemandDimension?.pricePerUnit?.USD || '0'
+
+        return {
+          instanceType,
+          onDemand: { pricePerHour: onDemandPrice },
+          // Note: Reserved and spot pricing would need additional API calls
+        }
+      })
+    )
+
+    return results
+      .filter(
+        (result): result is PromiseFulfilledResult<PriceListItem> =>
+          result.status === 'fulfilled' && result.value !== null
+      )
+      .map(result => result.value)
+  }
+
+  /**
+   * Internal method to get pricing for a single instance type
+   */
+  private async getPricingForInstance(
+    instanceType: string,
+    region = 'us-east-1'
+  ): Promise<PriceListItem | null> {
+    return this.getSingleInstancePricing(instanceType, region)
+  }
+
+  /**
+   * Enrich instance type with detailed hardware specifications
+   */
+  private enrichInstanceWithHardwareSpecs(
+    instance: InstanceType
+  ): InstanceType {
+    const enriched = { ...instance }
+
+    // Enhance processor information
+    if (enriched.ProcessorInfo) {
+      // Extract processor name from AWS attributes if available
+      const processorName = this.extractProcessorName(instance)
+      if (processorName) {
+        enriched.ProcessorInfo = HardwareSpecsService.enhanceProcessorInfo(
+          processorName,
+          enriched.ProcessorInfo
+        )
+      }
+    }
+
+    // Enhance memory information
+    if (enriched.MemoryInfo && enriched.InstanceType) {
+      enriched.MemoryInfo = HardwareSpecsService.enhanceMemoryInfo(
+        enriched.InstanceType,
+        enriched.MemoryInfo
+      )
+    }
+
+    // Enhance GPU information
+    if (enriched.GpuInfo?.Gpus) {
+      enriched.GpuInfo.Gpus = enriched.GpuInfo.Gpus.map(gpu => {
+        return HardwareSpecsService.enhanceGpuInfo(gpu.Name, gpu)
+      })
+    }
+
+    return enriched
+  }
+
+  /**
+   * Extract processor name from instance type data
+   */
+  private extractProcessorName(instance: InstanceType): string | null {
+    // For real AWS data, we'd need to parse from instance type patterns
+    // This is a simplified mapping based on AWS instance families
+    const instanceFamily = instance.InstanceType?.split('.')[0] || ''
+
+    const processorMappings: Record<string, string> = {
+      // Intel-based instances
+      m7i: 'Intel Ice Lake',
+      m6i: 'Intel Xeon Platinum 8259CL',
+      m5: 'Intel Xeon Platinum 8175',
+      c7i: 'Intel Ice Lake',
+      c6i: 'Intel Xeon Platinum 8259CL',
+      c5: 'Intel Xeon Platinum 8175',
+      r7i: 'Intel Ice Lake',
+      r6i: 'Intel Xeon Platinum 8259CL',
+      r5: 'Intel Xeon Platinum 8175',
+      t3: 'Intel Skylake E5 2686 v5',
+      t2: 'Intel Xeon E5-2676 v3',
+
+      // AMD-based instances
+      m7a: 'AMD EPYC 9R14',
+      m6a: 'AMD EPYC 7R32',
+      c7a: 'AMD EPYC 9R14',
+      c6a: 'AMD EPYC 7R32',
+      r7a: 'AMD EPYC 9R14',
+      r6a: 'AMD EPYC 7R32',
+
+      // AWS Graviton instances (all versions)
+      a1: 'AWS Graviton',
+      t4g: 'AWS Graviton2',
+      m6g: 'AWS Graviton2',
+      m6gd: 'AWS Graviton2',
+      m7g: 'AWS Graviton3',
+      c6g: 'AWS Graviton2',
+      c6gd: 'AWS Graviton2',
+      c7g: 'AWS Graviton3',
+      r6g: 'AWS Graviton2',
+      r6gd: 'AWS Graviton2',
+      r7g: 'AWS Graviton3',
+      hpc7g: 'AWS Graviton3E',
+
+      // AWS AI/ML instances
+      inf1: 'AWS Inferentia',
+      inf2: 'AWS Inferentia2',
+      trn1: 'AWS Trainium',
+      trn1n: 'AWS Trainium',
+      trn2: 'AWS Trainium2',
+    }
+
+    return processorMappings[instanceFamily] || null
   }
 
   /**

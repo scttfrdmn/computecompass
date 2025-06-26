@@ -1,6 +1,13 @@
 export interface ProcessorInfo {
   SupportedArchitectures: string[]
   SustainedClockSpeedInGhz?: number
+  // Enhanced processor details
+  Manufacturer?: string // Intel, AMD, AWS
+  Family?: string // Xeon, EPYC, Graviton
+  Model?: string // Platinum 8259CL, EPYC 7R32, Graviton3
+  Generation?: string // Ice Lake, Zen 3, etc.
+  CodeName?: string // Manufacturer code name
+  Features?: string[] // AVX, AVX2, AVX-512, etc.
 }
 
 export interface VCpuInfo {
@@ -13,6 +20,11 @@ export interface VCpuInfo {
 
 export interface MemoryInfo {
   SizeInMiB: number
+  // Enhanced memory specifications
+  Type?: string // DDR3, DDR4, DDR5
+  Speed?: string // 2400 MHz, 3200 MHz, etc.
+  Channels?: number // Number of memory channels
+  EccSupported?: boolean // Error-correcting code support
 }
 
 export interface NetworkInfo {
@@ -37,13 +49,33 @@ export interface InstanceStorageInfo {
 
 export interface GpuMemoryInfo {
   SizeInMiB: number
+  // Enhanced GPU memory specifications
+  Type?: string // HBM2, HBM2e, GDDR6, GDDR6X
+  Bandwidth?: string // Memory bandwidth in GB/s
+  BusWidth?: number // Memory bus width in bits
 }
 
 export interface GpuInfo {
   Name: string
-  Manufacturer: string
+  Manufacturer: string // NVIDIA, AMD, Intel
   Count: number
   MemoryInfo: GpuMemoryInfo
+  // Enhanced GPU specifications
+  Model?: string // Tesla V100, A100, H100, etc.
+  Generation?: string // Ampere, Ada Lovelace, RDNA2, etc.
+  Architecture?: string // Hopper, Ada, etc.
+  CodeName?: string // Manufacturer code name
+  ComputeCapability?: string // CUDA compute capability
+  Cores?: {
+    Cuda?: number // CUDA cores
+    RT?: number // RT cores
+    Tensor?: number // Tensor cores
+  }
+  ClockSpeed?: {
+    Base?: number // Base clock in MHz
+    Boost?: number // Boost clock in MHz
+  }
+  Features?: string[] // Ray tracing, Tensor cores, etc.
 }
 
 export interface InstanceGpuInfo {
@@ -148,7 +180,27 @@ export interface InstanceMatch {
     reserved3yr: number
     spotCurrent: number
     spotAverage24h?: number
+    savingsPlans1yr?: number
+    savingsPlans3yr?: number
   }
   matchScore: number
   matchReasons: string[]
+}
+
+export interface InstanceFamily {
+  family: string
+  name: string
+  description: string
+  category:
+    | 'general'
+    | 'compute'
+    | 'memory'
+    | 'storage'
+    | 'gpu'
+    | 'ai-ml'
+    | 'fpga'
+  processor: 'intel' | 'amd' | 'graviton' | 'inferentia' | 'trainium'
+  generation: number
+  instances: InstanceType[]
+  spotAvailable: boolean
 }
