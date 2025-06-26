@@ -32,8 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build application (skip TypeScript checking)
-        run: npx vite build
+      - name: Build application 
+        run: |
+          npm run build || npx vite build --minify false --sourcemap
         env:
           NODE_ENV: production
 
