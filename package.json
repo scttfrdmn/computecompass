@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest",
+    "test:ci": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
@@ -21,7 +22,8 @@
     "localstack:start": "docker-compose -f docker-compose.localstack.yml up -d",
     "localstack:stop": "docker-compose -f docker-compose.localstack.yml down",
     "localstack:logs": "docker-compose -f docker-compose.localstack.yml logs -f",
-    "test:localstack": "VITE_APP_ENV=development npm run test"
+    "test:localstack": "VITE_APP_ENV=development npm run test",
+    "test:integration": "VITE_APP_ENV=production vitest run --testNamePattern=\"Integration Tests\""
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
