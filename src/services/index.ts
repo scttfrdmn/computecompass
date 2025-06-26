@@ -1,2 +1,7 @@
 export * from './aws-service'
 export * from './instance-matcher'
+export * from './cost-optimizer'
+export * from './rag-service'
+export * from './vector-database'
+export * from './vector-database-init'
+export * from './rag-integration'

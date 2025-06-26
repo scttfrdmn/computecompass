@@ -37,7 +37,7 @@ export interface WorkloadPattern {
   interruptible?: boolean // Can use spot instances
 
   // Business context
-  priority: 'critical' | 'normal' | 'batch' | 'experimental'
+  priority: 'critical' | 'high' | 'normal' | 'low'
   team?: string
   project?: string
 
@@ -198,5 +198,47 @@ export interface UsageHistory {
   cost: {
     total: number
     breakdown: Record<string, number> // purchase type -> cost
+  }
+}
+
+// Cost optimization constraints and preferences
+export interface OptimizationConstraints {
+  maxCommitment?: '1yr' | '3yr' // Maximum commitment period
+  maxUpfrontPayment?: number // Maximum upfront payment in USD
+  prioritizeCost?: boolean // Prioritize cost savings over reliability
+  riskTolerance?: 'low' | 'medium' | 'high' // Risk tolerance level
+  flexibilityRequired?: boolean // Need for instance type flexibility
+  reliabilityRequired?: boolean // Need for high availability
+  spotInstancesAllowed?: boolean // Allow spot instance usage
+  minReservedPercentage?: number // Minimum percentage of reserved capacity
+  maxSpotPercentage?: number // Maximum percentage of spot capacity
+}
+
+// Risk assessment profile
+export interface RiskProfile {
+  overall: 'low' | 'medium' | 'high'
+  spotInterruption: number // Probability of spot interruption (0-1)
+  costVariability: 'low' | 'medium' | 'high' // Cost volatility level
+  commitmentRisk: 'low' | 'medium' | 'high' // Risk of over-commitment
+}
+
+// Complete optimization result
+export interface OptimizationResult {
+  id: string
+  optimalStrategy: PurchaseStrategy[] // Best strategy mix
+  alternativeScenarios: PurchaseStrategy[][] // Alternative options
+  costSavings: {
+    monthlySavings: number
+    annualSavings: number
+    savingsPercentage: number
+  }
+  riskAssessment: RiskProfile
+  recommendations: string[] // Optimization recommendations
+  confidenceLevel: number // 0-100 confidence in optimization
+  optimizationMetrics: {
+    strategiesCount: number
+    purchaseTypeDistribution: Record<string, number>
+    averageUtilization: number
+    riskDistribution: Record<string, number>
   }
 }

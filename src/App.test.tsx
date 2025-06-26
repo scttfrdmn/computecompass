@@ -1,10 +1,12 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import App from './App'
 
 // Mock the AWS services
 vi.mock('./services/aws-service')
 vi.mock('./services/instance-matcher')
+vi.mock('./services/benchmark-data')
 
 describe('App', () => {
   beforeEach(() => {
@@ -59,5 +61,20 @@ describe('App', () => {
     render(<App />)
     // This test would require triggering the error state, which needs workload selection
     // Full testing would require additional setup or integration tests
+  })
+
+  it('renders all key UI sections', () => {
+    render(<App />)
+    
+    // Check main sections are present
+    expect(screen.getByText('Configure Your Workload')).toBeInTheDocument()
+    expect(screen.getByText('Recommended Instances')).toBeInTheDocument()
+    expect(screen.getByText('Research Workload Template')).toBeInTheDocument()
+  })
+
+  it('shows appropriate message when no workload is selected', () => {
+    render(<App />)
+    
+    expect(screen.getByText(/Select a research workload or configure custom requirements/)).toBeInTheDocument()
   })
 })
